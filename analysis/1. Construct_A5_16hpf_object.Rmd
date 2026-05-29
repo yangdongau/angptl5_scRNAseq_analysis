@@ -1,0 +1,62 @@
+---
+title: "1. A5_16hpf_analysis"
+author: "Yang"
+date: "2024-06-12"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+### Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r packages}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(harmony)
+library(scRNAtoolVis)
+```
+
+# A5_16h
+```{r }
+A5_16h <- Read10X(here::here("data","A5_16h","filtered_feature_bc_matrix"))
+# Create Seurat object
+A5_16h <- CreateSeuratObject(counts = A5_16h, project = "A5_16h", min.cells = 3, min.features = 200)
+A5_16h[["percent.mt"]] <- PercentageFeatureSet(A5_16h, pattern = "^mt-")
+VlnPlot(A5_16h, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+
+A5_16h <- subset(A5_16h, subset = nFeature_RNA > 200 & nFeature_RNA < 7500 & percent.mt < 15)
+
+A5_16h <- NormalizeData(A5_16h, normalization.method = "LogNormalize", scale.factor = 10000)
+
+A5_16h <- FindVariableFeatures(A5_16h, selection.method = "vst", nfeatures = 2000)
+
+# Scaling the data
+# Regress out mitochondrial 
+A5_16h <-  ScaleData(A5_16h, vars.to.regress = "percent.mt")
+
+# Perform linear dimensional reduction
+A5_16h <- RunPCA(A5_16h, features = VariableFeatures(object = A5_16h))
+DimPlot(A5_16h, reduction = "pca")
+DimHeatmap(A5_16h, dims = 1, cells = 500, balanced = TRUE)
+
+# Cluster the cells
+A5_16h <- FindNeighbors(A5_16h, dims = 1:10)
+A5_16h <- FindClusters(A5_16h, resolution = 2)
+
+A5_16h <- RunUMAP(A5_16h, dims = 1:10)
+DimPlot(A5_16h, reduction = "umap", label = T)
+```
+
+# Save data
+```{r}
+saveRDS(A5_16h, here::here("output","A5_16h.rds"))
+```

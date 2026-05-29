@@ -1,0 +1,490 @@
+---
+title: "2. A5_16hpf_analysis_with_Daniocell"
+author: "Yang"
+date: "2024-06-19"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+### Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Load packages
+```{r packages}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(harmony)
+library(scRNAtoolVis)
+library(miloR)
+library(SingleCellExperiment)
+library(scater)
+library(scran)
+```
+
+# Load data
+```{r}
+A5_16h <- readRDS(here::here("output","A5_16h.rds"))
+ref_16h <- readRDS(here::here("reference","zf16_sc_Daniocell.rds"))
+```
+
+# Integration with 16 hpf zebrafish scRNA-seq reference data from DanioCell
+```{r}
+A5_16h$condition <- "A5_mut"
+A5_16h$sample <- "A5_mut"
+ref_16h$condition <- "wt"
+
+
+Merged_16hpf <- merge(A5_16h, ref_16h)
+Merged_16hpf <- NormalizeData(Merged_16hpf)
+Merged_16hpf <- FindVariableFeatures(Merged_16hpf)
+Merged_16hpf <- ScaleData(Merged_16hpf)
+Merged_16hpf <- RunPCA(Merged_16hpf)
+Merged_16hpf <- FindNeighbors(Merged_16hpf, dims = 1:30, reduction = "pca")
+Merged_16hpf <- FindClusters(Merged_16hpf, resolution = 2, cluster.name = "unintegrated_clusters")
+
+Merged_16hpf <- RunUMAP(Merged_16hpf, dims = 1:30, reduction = "pca", reduction.name = "umap.unintegrated")
+DimPlot(Merged_16hpf, reduction = "umap.unintegrated", group.by = c("sample", "seurat_clusters"))
+
+
+Merged_16hpf <- IntegrateLayers(object = Merged_16hpf, method = CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca",
+    verbose = FALSE)
+
+Merged_16hpf[["RNA"]] <- JoinLayers(Merged_16hpf[["RNA"]])
+Merged_16hpf <- FindNeighbors(Merged_16hpf, reduction = "integrated.cca", dims = 1:30)
+Merged_16hpf <- FindClusters(Merged_16hpf, resolution = 0.8)
+Merged_16hpf <- RunUMAP(Merged_16hpf, dims = 1:30, reduction = "integrated.cca")
+Idents(Merged_16hpf) <- Merged_16hpf$RNA_snn_res.0.8
+Merged_16hpf$condition <- factor(Merged_16hpf$condition, levels = c("wt","A5_mut"))
+DimPlot(Merged_16hpf, reduction = "umap", label = T, cols = my_color_palette)
+DimPlot(Merged_16hpf, reduction = "umap", label = T, cols = my_color_palette, split.by = "condition")
+FeaturePlot(Merged_16hpf, features = c("spi1b","etv2","gata1a"), reduction = "umap",split.by = "condition")
+# Save unannotated Seurat object
+saveRDS(Merged_16hpf, here::here("output","Merged_16hpf_unannotated_new.rds"))
+```
+
+# Find marker genes for each cell type
+```{r}
+markers_16h <-  FindAllMarkers(Merged_16hpf, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+top_genes_16h <- markers_16h %>%
+  group_by(cluster) %>%
+  slice_max(n = 10, order_by = avg_log2FC) 
+
+cluster0 <- "hindbrain"
+cluster1 <- "midbrain hindbrain boundary"
+cluster2 <- "somite"
+cluster3 <- "forebrain"
+cluster4 <- "epidermal"
+cluster5 <- "glial"
+cluster6 <- "optic vesicle"
+cluster7 <- "myotome"
+cluster8 <- "somite + PSM"
+cluster9 <- "Other"
+cluster10 <- "trigeminal placode"
+cluster11 <- "neural crest"
+cluster12 <- "neural plate"
+cluster13 <- "neural plate"
+cluster14 <- "otic placode"
+cluster15 <- "pharyngeal arch"
+cluster16 <- "neural plate"
+cluster17 <- "tail bud"
+cluster18 <- "adaxial cell"
+cluster19 <- "erythroid progenitors"
+cluster20 <- "heart primordium"
+cluster21 <- "HSCs"
+cluster22 <- "periderm"
+cluster23 <- "endoderm"
+cluster24 <- "optic vesicle"
+cluster25 <- "notochord"
+cluster26 <- "myotome"
+cluster27 <- "somite"
+cluster28 <- "lateral mesoderm"
+cluster29 <- "pharyngeal pouch"
+cluster30 <- "Rohon-Beard neuron"
+cluster31 <- "epidermal - foxi3a"
+cluster32 <- "hatching gland"
+cluster33 <- "pronephric duct"
+cluster34 <- "myeloid progenitors"
+cluster35 <- "YSL-like"
+
+cluster_markers_0 <- c("mpz","cyp26b1")
+FeaturePlot(Merged_16hpf,features = cluster_markers_0,reduction = "umap")
+# hindbrain
+
+cluster_markers_1 <- c("pax5","en2b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_1,reduction = "umap")
+# midbrain hindbrain boundary
+
+cluster_markers_2 <- c("wnt16","aldh1a2")
+FeaturePlot(Merged_16hpf,features = cluster_markers_2,reduction = "umap")
+# somite
+
+cluster_markers_3 <- c("fezf2","six6a")
+FeaturePlot(Merged_16hpf,features = cluster_markers_3,reduction = "umap")
+# forebrain
+
+cluster_markers_4 <- c("kera","sp6")
+FeaturePlot(Merged_16hpf,features = cluster_markers_4,reduction = "umap")
+# epidermal
+
+cluster_markers_5 <- c("pkd1b","gdf6b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_5,reduction = "umap")
+# glial
+
+cluster_markers_6 <- c("rx1","vsx2")
+FeaturePlot(Merged_16hpf,features = cluster_markers_6,reduction = "umap")
+# optic vesicle
+
+cluster_markers_7 <- c("mafaa","myog")
+FeaturePlot(Merged_16hpf,features = cluster_markers_7,reduction = "umap")
+# myotome
+
+cluster_markers_8 <- c("mespba","mespbb")
+FeaturePlot(Merged_16hpf,features = cluster_markers_8,reduction = "umap")
+# somite + PSM
+
+cluster_markers_9 <- c("mapk12b","rfc2")
+FeaturePlot(Merged_16hpf,features = cluster_markers_9,reduction = "umap")
+# Other
+
+cluster_markers_10 <- c("cplx2l","nhlh2","elavl4")
+FeaturePlot(Merged_16hpf,features = cluster_markers_10,reduction = "umap")
+# trigeminal placode
+
+cluster_markers_11 <- c("crestin","sox10")
+FeaturePlot(Merged_16hpf,features = cluster_markers_11,reduction = "umap")
+# neural crest
+
+cluster_markers_12 <- c("olig3","zic6","msx3")
+FeaturePlot(Merged_16hpf,features = cluster_markers_12,reduction = "umap")
+# neural plate
+
+cluster_markers_13 <- c("shhb","shha","nkx2.9","ntn1b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_13,reduction = "umap")
+# neural plate
+
+cluster_markers_14 <- c("cldna","fgf24","foxi1","six1b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_14,reduction = "umap")
+# otic placode
+
+cluster_markers_15 <- c("fibina","fmoda","prrx1a")
+FeaturePlot(Merged_16hpf,features = cluster_markers_15,reduction = "umap")
+# pharyngeal arch
+
+cluster_markers_16 <- c("chrd","pou5f3","scg3")
+FeaturePlot(Merged_16hpf,features = cluster_markers_16,reduction = "umap")
+# neural plate
+
+cluster_markers_17 <- c("eve1","vent")
+FeaturePlot(Merged_16hpf,features = cluster_markers_17,reduction = "umap")
+# tail bud
+
+
+cluster_markers_18 <- c("myl10","myl13")
+FeaturePlot(Merged_16hpf,features = cluster_markers_18,reduction = "umap")
+# adaxial cell
+
+cluster_markers_19 <- c("hbbe3","gata1a")
+FeaturePlot(Merged_16hpf,features = cluster_markers_19,reduction = "umap")
+# erythroid progenitors
+
+
+cluster_markers_20 <- c("cmlc1","myl7","tnni1b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_20,reduction = "umap")
+# heart primordium
+
+cluster_markers_21 <- c("flt1","cdh5","fli1b","etv2","lmo2","tal1")
+FeaturePlot(Merged_16hpf,features = cluster_markers_21,reduction = "umap")
+# hematopoietic stem cells
+
+cluster_markers_22 <- c("evplb","nceh1a")
+FeaturePlot(Merged_16hpf,features = cluster_markers_22,reduction = "umap")
+# periderm
+
+cluster_markers_23 <- c("foxa3","fgfrl1b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_23,reduction = "umap")
+# endoderm
+
+cluster_markers_24 <- c("rx1","vsx2")
+FeaturePlot(Merged_16hpf,features = cluster_markers_24,reduction = "umap")
+# optic vesicle
+
+cluster_markers_25 <- c("cmn","emilin3a")
+FeaturePlot(Merged_16hpf,features = cluster_markers_25,reduction = "umap")
+# notochord
+
+cluster_markers_26 <- c("myl1","mylz3")
+FeaturePlot(Merged_16hpf,features = cluster_markers_26,reduction = "umap")
+# myotome
+
+cluster_markers_27 <- c("aldh1a2","efemp2b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_27,reduction = "umap")
+# somite
+
+cluster_markers_28 <- c("hand2","sema3e")
+FeaturePlot(Merged_16hpf,features = cluster_markers_28,reduction = "umap")
+# lateral mesoderm
+
+cluster_markers_29 <- c("pax1a","pax1b","prdm1a")
+FeaturePlot(Merged_16hpf,features = cluster_markers_29,reduction = "umap")
+# pharyngeal pouch
+
+cluster_markers_30 <- c("tlx3b","tlx2","cntnap5a","mmp25b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_30,reduction = "umap")
+# Rohon-Beard neuron
+
+cluster_markers_31 <- c("s100a11","foxi3b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_31,reduction = "umap")
+# epidermal - foxi3a
+
+cluster_markers_32 <- c("ctslb","zgc:174855")
+FeaturePlot(Merged_16hpf,features = cluster_markers_32,reduction = "umap")
+# hatching gland
+
+cluster_markers_33 <- c("aqp8b","slc2a1a","cdh17","osr2","cldn15a")
+FeaturePlot(Merged_16hpf,features = cluster_markers_33,reduction = "umap")
+# pronephric duct
+
+cluster_markers_34 <- c("il6r","spi1b")
+FeaturePlot(Merged_16hpf,features = cluster_markers_34,reduction = "umap")
+# myeloid progenitors
+
+cluster_markers_35 <- c("afp4","serpina1")
+FeaturePlot(Merged_16hpf,features = cluster_markers_35,reduction = "umap")
+# YSL-like
+
+FeaturePlot(Merged_16hpf, features = c("aldh1a2","tbx6","aldh1a2","tbxta"), reduction = "umap")
+FeaturePlot(Merged_16hpf, features = c("spi1b"), reduction = "umap",split.by = "sample")
+
+Idents(Merged_16hpf) <- "RNA_snn_res.0.8"
+Idents(Merged_16hpf_rename) <- "subset.full"
+DimPlot(Merged_16hpf_rename, reduction = "umap", label = T, cols = my_color_palette, split.by = "sample") + NoLegend()
+DotPlot(Merged_16hpf, features = "spi1b")
+```
+
+# Annotate cell types
+```{r}
+new_idents <- c("hindbrain", "midbrain hindbrain boundary", "somite",
+                "forebrain", "epidermal", "glial", "optic vesicle",
+                "myotome", "somite + PSM", "Other", "trigeminal placode",
+                "neural crest", "neural plate", "neural plate", "otic placode",
+                "pharyngeal arch", "neural plate", "tail bud", "adaxial cell",
+                "erythroid progenitors", "heart primordium", "HSCs",
+                "periderm", "endoderm", "optic vesicle", "notochord", "myotome",
+                "somite", "lateral mesoderm", "pharyngeal pouch", "Rohon-Beard neuron",
+                "epidermal - foxi3a", "hatching gland", "pronephric duct",
+                "myeloid progenitors", "YSL-like")
+
+names(new_idents) <- levels(Merged_16hpf)
+Merged_16hpf_rename <- RenameIdents(Merged_16hpf,new_idents)
+Merged_16hpf_rename$cell_types_new <- Idents(Merged_16hpf_rename)
+
+DimPlot(Merged_16hpf_rename, reduction = "umap", label = T, cols = my_color_palette, split.by = "condition") 
+Idents(Merged_16hpf_rename) <- Merged_16hpf_rename$cell_types_new
+
+DimPlot(Merged_16hpf_rename, reduction = "umap", cols = my_color_palette) + NoLegend()
+DimPlot(Merged_16hpf_rename, reduction = "umap", cols = my_color_palette, label = T) + NoLegend()
+
+Merged_16hpf_rename$condition <- factor(Merged_16hpf_rename$condition, levels = c("wt","A5_mut"))
+```
+
+# Group nearby clusters
+```{r}
+new_idents <- c("neural", "neural", "mesoderm",
+                "neural", "epidermal, endoderm & otic placode", "neural", "optic vesicle",
+                "mesoderm", "mesoderm", "neural", "neural",
+                "neural crest", "neural", "epidermal, endoderm & otic placode",
+                "mesoderm", "mesoderm", "mesoderm", 
+                "erythroid lineages", "mesoderm", "hematopoietic stem cells",
+                "periderm", "epidermal, endoderm & otic placode", "notochord", "mesoderm",
+                "epidermal, endoderm & otic placode", "neural","epidermal, endoderm & otic placode",
+                "hatching gland","mesoderm","macrophage","YSL-like")
+
+names(new_idents) <- levels(Merged_16hpf_rename)
+Merged_16hpf_rename <- RenameIdents(Merged_16hpf_rename,new_idents)
+Merged_16hpf_rename$cell_type_layer <- Idents(Merged_16hpf_rename)
+
+Idents(Merged_16hpf_rename) <- Merged_16hpf_rename$cell_types_new
+
+Idents(Merged_16hpf_rename) <- Merged_16hpf_rename$cell_type_layer
+DimPlot(Merged_16hpf_rename, reduction = "umap", label = T)
+```
+
+# Save annotated Seurat object
+```{r}
+saveRDS(Merged_16hpf_rename, here::here("output","Merged_16h_new.rds"))
+```
+
+# Subset hematopoietic lineages
+```{r}
+subset <- subset(Merged_16hpf_rename, subset = cell_types_new == "HSCs" | cell_types_new == "myeloid progenitors" | cell_types_new == "erythroid progenitors")
+```
+
+# Calulate cell proportion
+```{r}
+hematopoietic_prop_wt <- prop.table(table(Merged_16hpf_rename[,(Merged_16hpf_rename@meta.data$condition == "wt"),]@meta.data$cell_types_new)) %>% 
+  as.data.frame() %>%
+  dplyr::filter(.$Var1 %in% c("HSCs","erythroid progenitors","myeloid progenitors"))
+hematopoietic_prop_wt$sample <- "wt"
+
+hematopoietic_prop_A5mut <- prop.table(table(Merged_16hpf_rename[,(Merged_16hpf_rename@meta.data$condition == "A5_mut"),]@meta.data$cell_types_new)) %>% 
+  as.data.frame() %>%
+  dplyr::filter(.$Var1 %in% c("HSCs","erythroid progenitors","myeloid progenitors"))
+hematopoietic_prop_A5mut$sample <- "A5_mut"
+
+# Cell proportion plot
+df_plot <- hematopoietic_prop_wt %>% rbind(hematopoietic_prop_A5mut)
+df_plot$sample <- factor(df_plot$sample, levels = c("wt","A5_mut"))
+df_plot$Var1 <- factor(df_plot$Var1, levels = c("HSCs","erythroid progenitors","myeloid progenitors"))
+
+ggplot(df_plot, aes(Var1, Freq, fill = sample,width=.5)) +
+  geom_col(position = position_dodge()) +
+  theme_bw() + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"), axis.title.x=element_blank()) +
+  scale_y_continuous(limits = c(0,0.03), expand = c(0, 0)) 
+
+# Cell proportion plot with wt proportion as 1
+df_plot_2 <- hematopoietic_prop_A5mut
+
+df_plot_2$Freq <- df_plot_2$Freq/hematopoietic_prop_wt$Freq
+x <- hematopoietic_prop_wt
+x$Freq <- 1
+df_plot_2 <- x %>% rbind(df_plot_2)
+df_plot_2$sample <- factor(df_plot_2$sample, levels = c("wt","A5_mut"))
+df_plot_2$Var1 <- factor(df_plot_2$Var1, levels = c("HSCs","erythroid progenitors","myeloid progenitors"))
+  
+ggplot(df_plot_2, aes(Var1, Freq, fill = sample,width=.5)) +
+  geom_col(position = position_dodge()) +
+  theme_bw() + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"), axis.title.x=element_blank()) +
+  scale_y_continuous(limits = c(0,3), expand = c(0, 0)) +
+  ylab("Relative cell number")
+
+write_csv(df_plot, here::here("cell_proportion.csv"))
+write_csv(df_plot_2, here::here("cell_proportion_2.csv"))
+```
+
+# Differential abundance analysis using miloR
+```{r}
+sce <- as.SingleCellExperiment(Merged_16hpf_rename)
+
+plotUMAP(sce,  colour_by="sample")
+milo <- Milo(sce)
+
+set.seed(1)
+
+milo <- buildGraph(milo, k = 30, d = 30, reduced.dim = "INTEGRATED.CCA")
+milo <- makeNhoods(milo, prop = 0.1, k = 30, d=30, refined = TRUE, reduced_dims = "INTEGRATED.CCA")
+plotNhoodSizeHist(milo)
+
+milo <- countCells(milo, meta.data = as.data.frame(colData(milo)), sample="sample")
+head(nhoodCounts(milo))
+
+design <- data.frame(colData(milo))[,c("sample","condition")]
+design <- distinct(design)
+rownames(design) <- design$sample
+
+milo <- calcNhoodDistance(milo, d=30, reduced.dim = "INTEGRATED.CCA")
+
+da_results <- testNhoods(milo, design = ~ condition, design.df = design)
+head(da_results)
+
+da_results %>%
+  arrange(SpatialFDR) %>%
+  head() 
+ggplot(da_results, aes(PValue)) + geom_histogram(bins=50)
+
+ggplot(da_results, aes(logFC, -log10(SpatialFDR))) + 
+  geom_point() +
+  geom_hline(yintercept = 1) ## Mark significance threshold (10% FDR)
+
+milo <- buildNhoodGraph(milo)
+
+umap_pl <- plotReducedDim(milo, dimred = "UMAP", colour_by="condition", text_by = "cell_type_layer", 
+                          text_size = 3, point_size=0.5) +
+  guides(fill="none")
+
+nh_graph_pl <- plotNhoodGraphDA(milo, da_results, layout="UMAP",alpha=0.1) 
+
+umap_pl + nh_graph_pl +
+  plot_layout(guides="collect")
+
+nh_graph_pl
+
+da_results <- annotateNhoods(milo, da_results, coldata_col = "cell_type_layer")
+head(da_results)
+
+ggplot(da_results, aes(cell_type_layer_fraction)) + geom_histogram(bins=50)
+
+da_results$cell_type_layer <- factor(da_results$cell_type_layer, levels = c("hatching gland","periderm","epidermal, endoderm & otic placode", "optic vesicle","neural","neural crest","notochord","mesoderm","hematopoietic stem cells","erythroid lineages","macrophage","YSL-like"))
+
+
+da_results$cell_type_layer <- factor(da_results$cell_type_layer, levels = c("YSL-like","macrophage","erythroid lineages","hematopoietic stem cells", "mesoderm", "notochord","neural crest","neural","optic vesicle","epidermal, endoderm & otic placode","periderm","hatching gland"))
+
+result <- da_results
+
+ident_order <- c("YSL-like","macrophage","erythroid lineages","hematopoietic stem cells", "mesoderm", "notochord","neural crest","neural","optic vesicle","epidermal, endoderm & otic placode","periderm","hatching gland") # For example
+result$cell_type_layer <- factor(result$cell_type_layer, levels=ident_order)
+
+plotDAbeeswarm(result, group.by="cell_type_layer")
+
+plotDAbeeswarm(da_results, group.by = "cell_type_layer")
+```
+
+# Dotplot of marker genes
+```{r}
+marker_show <- c("fezf2","six6a",  # forebrain
+                 "pax5","en2b",    # midbrain hindbrain boundary
+                 "mpz","cyp26b1",  # hindbrain
+                 "cplx2l","nhlh2", # trigeminal placode
+                 "chrd","pou5f3",  # neural plate
+                 "pkd1b","gdf6b",  # glial
+                 "tlx3b","tlx2",   # Rohon-Beard neuron
+                 "crestin","sox10",# neural crest
+                 "evplb","nceh1a", # periderm
+                 "rx1","vsx2",     # optic vesicle
+                 "cldna","fgf24",  # otic placode
+                 "foxa3","fgfrl1b",  # endoderm
+                 "pax1a","pax1b",  # pharyngeal pouch
+                 "s100a11","foxi3b", # epidermal - foxi3b
+                 "kera","sp6",     # epidermal
+                 "hand2","sema3e", # lateral mesoderm
+                 "cmlc1","myl7",   # heart primordium
+                 "fibina","fmoda", # pharyngeal arch
+                 "aqp8b", "cdh17", # pronephric duct
+                 "mafaa","myog",   # myotome
+                 "myl10","myl13",  # adaxial cell
+                 "aldh1a2","efemp2b", # somite
+                 "mespba","msgn1", # somite + PSM
+                 "eve1","vent",    # tail bud
+                 "cmn","emilin3a", # notochord
+                 "ctslb","zgc:174855", # hatching gland
+                 "tal1","lmo2", # HSCs
+                 "hbbe3","gata1a", # erythroid lineages
+                 "il6r","spi1b",   # macrophage
+                 "afp4","serpina1" # YSL-like
+                 )
+
+cell_type_order <- c("forebrain","midbrain hindbrain boundary","hindbrain","trigeminal placode", "neural plate",
+                     "glial", "Rohon-Beard neuron", "neural crest", "periderm", 
+                     "optic vesicle", "otic placode", "endoderm", "pharyngeal pouch", 
+                     "epidermal - foxi3a", "epidermal", "lateral mesoderm", "heart primordium", "pharyngeal arch",
+                     "pronephric duct",  "myotome", "adaxial cell", "somite", "somite + PSM",
+                     "tail bud", "notochord", "hatching gland", "HSCs",
+                     "erythroid progenitors","myeloid progenitors", "YSL-like","Other")
+
+Merged_16hpf_rename@meta.data$cell_type_ordered <- factor(Merged_16hpf_rename@meta.data$cell_types_new,levels = cell_type_order)
+
+Idents(Merged_16hpf_rename) <- 'cell_type_ordered'
+
+jjDotPlot(object = Merged_16hpf_rename, gene = marker_show,id = 'cell_type_ordered',cluster.order = cell_type_order[31:1],ytree = F)
+```

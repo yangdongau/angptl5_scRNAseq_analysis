@@ -1,0 +1,90 @@
+---
+title: "3. Gene expression on referece dataset"
+author: "Yang"
+date: "2026-05-29"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+### Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Load packages
+```{r packages}
+library(limma)
+library(readr)
+library(tidyverse)
+library(magrittr)
+library(Seurat)
+library(dplyr)
+```
+
+# Load reference data from Wagner et al. 2018 
+```{r}
+klein_seurat <- readRDS(here::here("data","klein_seurat.rds"))
+```
+
+# Check angptl5 and spi1b expression on 18 hpf zebrafish embryo
+```{r}
+klein_seurat <- UpdateSeuratObject(klein_seurat)
+embryo_18h <- subset(klein_seurat, subset = TimeID == "18hpf")
+embryo_18h <- FindVariableFeatures(embryo_18h, selection.method = "vst", nfeatures = 2000)
+embryo_18h <-  ScaleData(embryo_18h, vars.to.regress = "percent.mt")
+
+embryo_18h <- RunPCA(embryo_18h, features = VariableFeatures(object = embryo_18h))
+DimPlot(embryo_18h, reduction = "pca")
+DimHeatmap(embryo_18h, dims = 1, cells = 500, balanced = TRUE)
+
+# Cluster the cells
+embryo_18h <- FindNeighbors(embryo_18h, dims = 1:30)
+embryo_18h <- FindClusters(embryo_18h, resolution = 0.4)
+
+embryo_18h <- RunUMAP(embryo_18h, dims = 1:30)
+embryo_18h$ClusterName <- replace(embryo_18h$ClusterName, embryo_18h$ClusterName == "18hpf-macrophage - ly75", "18hpf-macrophage")
+Idents(embryo_18h) <- embryo_18h$ClusterName
+
+DimPlot(embryo_18h, reduction = "umap", label = T, cols = my_color_palette) + NoLegend()
+DimPlot(embryo_18h, reduction = "umap", cols = my_color_palette) + NoLegend()
+
+FeaturePlot(embryo_18h, features = c("angptl5","spi1b"))
+
+embryo_18h_subset <- subset(embryo_18h, subset = ClusterName == "18hpf-macrophage - ly75" | ClusterName == "18hpf-macrophage")
+p <- DimPlot(embryo_18h_subset, reduction = "umap") 
+cells_selected <- CellSelector(p)
+embryo_18h_subset_selected <- embryo_18h_subset[,cells_selected]
+
+FeaturePlot(embryo_18h_subset_selected, features = c("angptl5","spi1b"), cols = c("grey","darkred"))
+```
+
+# Check angptl5 and spi1b expression on 24 hpf zebrafish embryo
+```{r}
+embryo_24h <- subset(klein_seurat, subset = TimeID == "24hpf")
+embryo_24h <- FindVariableFeatures(embryo_24h, selection.method = "vst", nfeatures = 2000)
+embryo_24h <-  ScaleData(embryo_24h, vars.to.regress = "percent.mt")
+
+embryo_24h <- RunPCA(embryo_24h, features = VariableFeatures(object = embryo_24h))
+DimPlot(embryo_24h, reduction = "pca")
+DimHeatmap(embryo_24h, dims = 1, cells = 500, balanced = TRUE)
+
+# Cluster the cells
+embryo_24h <- FindNeighbors(embryo_24h, dims = 1:30)
+embryo_24h <- FindClusters(embryo_24h, resolution = 0.4)
+
+embryo_24h <- RunUMAP(embryo_24h, dims = 1:30)
+Idents(embryo_24h) <- embryo_24h$ClusterName
+DimPlot(embryo_24h, reduction = "umap", label = T) + NoLegend()
+DimPlot(embryo_24h, reduction = "umap", cols = my_color_palette) + NoLegend()
+FeaturePlot(embryo_24h, features = c("angptl5","spi1b"))
+
+embryo_24h_subset <- subset(embryo_24h, subset = ClusterName == "24hpf-leukocyte" | ClusterName == "24hpf-macrophage")
+DimPlot(embryo_24h_subset, reduction = "umap") 
+FeaturePlot(embryo_24h_subset, features = c("angptl5","spi1b"),cols = c("grey","darkred"))
+DotPlot(embryo_24h_subset,features = c("angptl5","spi1b"))
+```
