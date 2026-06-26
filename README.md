@@ -1,7 +1,7 @@
 # Angptl5 restricts primitive hematopoiesis by modulating retinoic acid signaling in zebrafish
 
 ### Jing Mo<sup>†</sup>, Dinghao Zhuo<sup>†</sup>, Min Gao<sup>†</sup>, Ying Huang, Tao Cheng, Yang Dong, ..., Li-Ping Shu*, Peng-Fei Xu*
-[![DOI](https://img.shields.io/badge/DOI-10.1371/journal.pbio.3003858-blue)](https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.3003858)
+[![DOI](https://img.shields.io/badge/DOI-10.1371/journal.pbio.3003858-blue)](https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.3003858)[![DOI](https://img.shields.io/badge/DOI-10.1101/2024.07.01.601472-yellowgreen)](https://www.biorxiv.org/content/10.1101/2025.08.18.670818v1)
 
 ## About
 If you have any questions, please feel free to contact Dr. Yang Dong (yang.dongau@gmail.com).
